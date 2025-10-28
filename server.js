@@ -271,11 +271,28 @@ app.post('/add-participants',verifyAuth, isAttendanceLocked,async (req,res)=>{
         const payload = jwt.verify(token,process.env.JWT_SECRET);
         const event = await Event.findOne({ id: payload.eventId });
 
+        //remove duplicate entries
         const existingRegnos = new Set(event.participants.map(p => p.regno));
+        existingRegnos.add("");//to omit null name, regno, timestamp entries
         const newParticipants = participantArray.filter(p => !existingRegnos.has(p.regno));
 
-        event.participants = event.participants.concat(newParticipants);
-        console.log(event.participants);
+        function normalizeDate(ts) {
+            if (!ts) return null;
+            if (ts instanceof Date) return ts;
+            const [datePart, timePart] = ts.split(' ');
+            const [day, month, year] = datePart.split(/[-/]/);
+            return new Date(`${year}-${month}-${day}T${timePart}:00`);
+        }
+          
+        const validParticipants = newParticipants
+          .filter(p => p.name && p.regno && p.timestamp)
+          .map(p => ({
+            ...p,
+            timestamp: normalizeDate(p.timestamp)
+        }));
+          
+
+        event.participants = event.participants.concat(validParticipants);
         await event.save();
 
         const newEntries = newParticipants.length;
@@ -284,6 +301,7 @@ app.post('/add-participants',verifyAuth, isAttendanceLocked,async (req,res)=>{
         const message = (duplicateEntries)?`${newEntries} new entries added.(${duplicateEntries} duplicate entries.)`:`${newEntries} new entries added`;
         res.json({ success:true,message })
     }catch(err){
+        console.log(err);
         res.json({ success:false,message:"SERVER ERROR: New entries not saved to DB"});
     }
 })
