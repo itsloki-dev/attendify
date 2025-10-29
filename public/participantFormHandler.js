@@ -25,7 +25,7 @@ export async function handleCSV(csvInput) {
     try{
         const text = await file.text();
         const aliasMap = {
-            timestamp: ["timestamp", "time stamp", "time"],
+            // timestamp: ["timestamp", "time stamp", "time"],
             name: ["name", "full name", "participant name"],
             regno: ["regno", "reg no", "registration no","registration number"],
             phno: ["phno","phone", "phone no", "phone number"]

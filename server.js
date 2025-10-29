@@ -271,32 +271,48 @@ app.post('/add-participants',verifyAuth, isAttendanceLocked,async (req,res)=>{
         const payload = jwt.verify(token,process.env.JWT_SECRET);
         const event = await Event.findOne({ id: payload.eventId });
 
+
         //remove duplicate entries
         const existingRegnos = new Set(event.participants.map(p => p.regno));
-        existingRegnos.add("");//to omit null name, regno, timestamp entries
-        const newParticipants = participantArray.filter(p => !existingRegnos.has(p.regno));
+        existingRegnos.add("");//to omit null name, regno entries
+        const newParticipantEntries = participantArray.filter(p => !existingRegnos.has(p.regno));
 
-        function normalizeDate(ts) {
-            if (!ts) return null;
-            if (ts instanceof Date) return ts;
-            const [datePart, timePart] = ts.split(' ');
-            const [day, month, year] = datePart.split(/[-/]/);
-            return new Date(`${year}-${month}-${day}T${timePart}:00`);
-        }
+        // function normalizeDate(ts) {
+        //     if (!ts) return null;
+        //     if (ts instanceof Date) return ts;
+        //     const [datePart, timePart] = ts.split(' ');
+        //     const [day, month, year] = datePart.split(/[-/]/);
+        //     return new Date(`${year}-${month}-${day}T${timePart}:00`);
+        // }
           
-        const validParticipants = newParticipants
-          .filter(p => p.name && p.regno && p.timestamp)
-          .map(p => ({
-            ...p,
-            timestamp: normalizeDate(p.timestamp)
-        }));
+        // const validParticipants = newParticipants
+        //   .filter(p => p.name && p.regno && p.timestamp)
+        //   .map(p => ({
+        //     ...p,
+        //     timestamp: normalizeDate(p.timestamp)
+        // }));
           
 
-        event.participants = event.participants.concat(validParticipants);
+        //remove duplicates in uploaded array(csv file)
+        const regnoEntries = new Set();
+        const newParticipants = new Array();
+        let entryDuplicates = 0;
+        newParticipantEntries.forEach(entry => {
+            if(!regnoEntries.has(entry.regno)){
+                regnoEntries.add(entry.regno);
+                newParticipants.push(entry);
+            }else{
+                entryDuplicates++;
+                console.log('Duplicate Entry ',entryDuplicates,': ',entry.regno);
+            }
+        });
+          
+
+        event.participants = event.participants.concat(newParticipants);
         await event.save();
 
         const newEntries = newParticipants.length;
-        const duplicateEntries = participantArray.length - newEntries;
+        const duplicateEntries = participantArray.length - newEntries + entryDuplicates;
 
         const message = (duplicateEntries)?`${newEntries} new entries added.(${duplicateEntries} duplicate entries.)`:`${newEntries} new entries added`;
         res.json({ success:true,message })
